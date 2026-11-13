@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Presentación del Proyecto Integrador MiniHTML: gramática, autómata a pila y analizador en C++.">
+<title>Analizador MiniHTML</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: una diapositiva por pantalla sobre hoja cuadriculada de apuntes; barra de progreso arriba y controles abajo. */
+:root{
+  --paper:#F4F6FA; --grid:rgba(47,91,234,.075); --card:#FFFFFF; --ink:#15213A; --muted:#5A6782; --line:#D6DDEA;
+  --accent:#2F5BEA; --accent-soft:#E2E9FD;
+  --tag-p:#2F5BEA; --tag-p-soft:#E2E9FD;
+  --tag-b:#C9721F; --tag-b-soft:#FBEAD6;
+  --tag-i:#8148D0; --tag-i-soft:#EFE5FB;
+  --texto:#4B5875; --texto-soft:#E9EDF4;
+  --ok:#1B845A; --ok-soft:#DCF1E6; --err:#C2352B; --err-soft:#FADFDC;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+  --shadow:0 1px 2px rgba(21,33,58,.06), 0 8px 24px rgba(21,33,58,.06);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --paper:#0E1522; --grid:rgba(140,170,255,.06); --card:#141D2E; --ink:#E5EBF6; --muted:#97A3BC; --line:#28344B;
+  --accent:#7D9CFF; --accent-soft:#1D2A4C;
+  --tag-p:#7D9CFF; --tag-p-soft:#1D2A4C; --tag-b:#F0A55A; --tag-b-soft:#3A2814; --tag-i:#B794F6; --tag-i-soft:#2E2148;
+  --texto:#AAB5CC; --texto-soft:#1E283A; --ok:#4CC38A; --ok-soft:#12301F; --err:#FF7B70; --err-soft:#3B1715;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25); color-scheme:dark }}
+:root[data-theme="dark"]{
+  --paper:#0E1522; --grid:rgba(140,170,255,.06); --card:#141D2E; --ink:#E5EBF6; --muted:#97A3BC; --line:#28344B;
+  --accent:#7D9CFF; --accent-soft:#1D2A4C;
+  --tag-p:#7D9CFF; --tag-p-soft:#1D2A4C; --tag-b:#F0A55A; --tag-b-soft:#3A2814; --tag-i:#B794F6; --tag-i-soft:#2E2148;
+  --texto:#AAB5CC; --texto-soft:#1E283A; --ok:#4CC38A; --ok-soft:#12301F; --err:#FF7B70; --err-soft:#3B1715;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25); color-scheme:dark }
+
+html{scroll-snap-type:y proximity; scroll-behavior:smooth; overflow-x:clip}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{transition:none!important; animation:none!important} }
+body{background:var(--paper); color:var(--ink); font:16px/1.55 var(--f-body);
+  background-image:linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:28px 28px; background-attachment:fixed}
+body::before{content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top,0px); z-index:30; background:var(--paper)}
+
+.slide{min-height:100dvh; scroll-snap-align:start; display:flex; align-items:center;
+  padding-block:72px 96px; padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px))}
+.wrap{width:100%; max-width:1120px; margin:0 auto; display:flex; flex-direction:column; gap:28px; min-width:0}
+.eyebrow{font:600 12px/1 var(--f-mono); letter-spacing:.12em; text-transform:uppercase; color:var(--accent); display:flex; gap:10px; align-items:center}
+.eyebrow b{display:inline-grid; place-items:center; min-width:26px; height:26px; padding:0 6px; border-radius:6px; background:var(--accent); color:var(--card); font-weight:600}
+h1,h2,h3{font-family:var(--f-display); text-wrap:balance; margin:0; letter-spacing:-.01em}
+h2{font-size:clamp(30px, 4.4vw, 50px); line-height:1.05; font-weight:800}
+h3{font-size:20px; font-weight:700}
+p{margin:0; max-width:68ch}
+.lead{font-size:clamp(17px,1.6vw,20px); color:var(--muted)}
+.grid2{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:24px}
+.grid3{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:18px}
+@media (max-width:820px){ .grid2,.grid3{grid-template-columns:minmax(0,1fr)} }
+.card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; box-shadow:var(--shadow); min-width:0}
+.card h3{margin-bottom:8px}
+.muted{color:var(--muted)}
+code,.mono{font-family:var(--f-mono); font-size:.92em}
+ul.clean{list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px}
+ul.clean li{display:flex; gap:10px; align-items:flex-start}
+ul.clean li::before{content:""; flex:none; width:7px; height:7px; border-radius:2px; background:var(--accent); margin-top:.6em}
+
+/* fichas de tokens */
+.tok{display:inline-flex; align-items:center; font:600 14px/1 var(--f-mono); padding:7px 10px; border-radius:8px; border:1.5px solid currentColor; white-space:nowrap}
+.tok.p{color:var(--tag-p); background:var(--tag-p-soft)} .tok.b{color:var(--tag-b); background:var(--tag-b-soft)}
+.tok.i{color:var(--tag-i); background:var(--tag-i-soft)} .tok.t{color:var(--texto); background:var(--texto-soft)}
+.tok.bad{color:var(--err); background:var(--err-soft)}
+.toks{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+
+/* botones */
+button,.btn{font:600 14px/1 var(--f-body); color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:9px; padding:10px 14px; cursor:pointer; transition:background .15s, border-color .15s, transform .1s}
+button:hover{border-color:var(--accent)} button:active{transform:translateY(1px)}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+button.primary{background:var(--accent); color:var(--card); border-color:var(--accent)}
+button.chip{padding:7px 11px; font:600 13px/1 var(--f-mono)}
+button.chip[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--accent)}
+.row{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+input[type=text]{font:500 15px/1.2 var(--f-mono); color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:9px; padding:11px 13px; width:100%; min-width:0}
+input[type=range]{accent-color:var(--accent); width:100%}
+
+/* portada */
+.hero{display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr); gap:40px; align-items:center}
+@media (max-width:820px){ .hero{grid-template-columns:minmax(0,1fr)} }
+.hero h1{font-size:clamp(44px,7.5vw,96px); line-height:.95; font-weight:800}
+.hero h1 .tag{font-family:var(--f-mono); font-weight:600; color:var(--accent); font-size:.5em; vertical-align:.45em}
+.meta{display:grid; grid-template-columns:auto 1fr; gap:6px 16px; font-size:15px}
+.meta dt{color:var(--muted)} .meta dd{margin:0; font-weight:500}
+.stackart{display:flex; flex-direction:column-reverse; gap:8px; align-items:stretch; max-width:260px; margin-inline:auto; width:100%}
+.stackart .cell{font:600 18px/1 var(--f-mono); text-align:center; padding:16px; border-radius:10px; border:1.5px solid currentColor; animation:drop .6s cubic-bezier(.2,.9,.3,1.3) both}
+@keyframes drop{from{transform:translateY(-40px); opacity:0} to{transform:none; opacity:1}}
+
+/* diagramas svg */
+svg text{font-family:var(--f-mono)}
+.diagram{width:100%; height:auto; display:block}
+.scrollx{overflow-x:auto; min-width:0}
+
+/* tabla */
+table{border-collapse:collapse; width:100%; font-size:14px}
+th,td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top}
+th{font:600 12px/1.2 var(--f-mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted)}
+td.mono{font-family:var(--f-mono); font-size:13px; white-space:nowrap}
+tr.hl td{background:var(--accent-soft)}
+tr.hl td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+
+/* producciones */
+.prods{display:grid; gap:10px}
+.prod{border-radius:10px; background:var(--card); border:1px solid var(--line); transition:border-color .15s, background .15s}
+.prod .ph{width:100%; display:grid; grid-template-columns:42px minmax(0,1fr) 28px; gap:12px; align-items:center; padding:12px 14px; background:none; border:0; border-radius:10px; text-align:left; color:inherit}
+.prod .ph:hover{background:var(--accent-soft)}
+.prod .plus{display:grid; place-items:center; width:26px; height:26px; border-radius:50%; border:1.5px solid var(--accent); color:var(--accent); font:600 16px/1 var(--f-mono); transition:transform .2s, background .2s}
+.prod .ph[aria-expanded="true"] .plus{transform:rotate(45deg); background:var(--accent); color:var(--card)}
+.prod .pop{margin:0 14px 14px 68px; padding:12px 14px; border-radius:9px; background:var(--paper); border-left:3px solid var(--accent); font-size:15px; display:flex; flex-direction:column; gap:8px; animation:pop .25s ease both}
+.prod .pop[hidden]{display:none}
+@keyframes pop{from{opacity:0; transform:translateY(-6px)} to{opacity:1; transform:none}}
+@media (max-width:600px){ .prod .pop{margin-left:14px} }
+.prod.open{border-color:var(--accent)}
+.pgroup{font:600 12px/1.3 var(--f-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-top:6px}
+.gdef{display:grid; grid-template-columns:auto minmax(0,1fr); gap:12px 16px; align-items:baseline}
+.gdef dt{font:600 16px/1.3 var(--f-mono); color:var(--accent); white-space:nowrap}
+.gdef dd{margin:0}
+.cond{display:grid; grid-template-columns:40px minmax(0,1fr); gap:12px; align-items:start}
+.cond .num{display:grid; place-items:center; width:34px; height:34px; border-radius:9px; background:var(--accent); color:var(--card); font:700 16px/1 var(--f-mono)}
+.cond h3{font-size:17px; margin-bottom:4px}
+.prod .n{font:600 13px/1 var(--f-mono); color:var(--muted)}
+.prod .r{font:600 17px/1.3 var(--f-mono)}
+.prod .why{grid-column:2; font-size:14px; color:var(--muted)}
+.prod.on{border-color:var(--accent); background:var(--accent-soft)}
+.v{color:var(--accent)}
+
+/* derivación */
+.sent{font:600 16px/1.6 var(--f-mono); background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; min-height:56px; overflow-x:auto; white-space:nowrap}
+.sent .nt{color:var(--accent)} .sent .cur{background:var(--accent); color:var(--card); border-radius:5px; padding:1px 6px}
+.badge{display:inline-flex; align-items:center; gap:6px; font:600 13px/1 var(--f-mono); padding:6px 10px; border-radius:999px; background:var(--accent-soft); color:var(--accent)}
+
+/* simulador AP */
+.sim{display:grid; grid-template-columns:minmax(0,1fr) 190px; gap:20px}
+@media (max-width:820px){ .sim{grid-template-columns:minmax(0,1fr)} }
+.tape{display:flex; gap:6px; overflow-x:auto; padding:30px 4px 6px; position:relative; min-height:76px}
+.tape .tok{position:relative; transition:opacity .2s}
+.tape .tok.read{opacity:.38}
+.tape .tok.head::before{content:"▼"; position:absolute; top:-22px; left:50%; transform:translateX(-50%); color:var(--accent); font-size:14px}
+.tape .end{font:600 13px/1 var(--f-mono); color:var(--muted); padding:7px 8px; border:1.5px dashed var(--line); border-radius:8px}
+.tape .end.head{color:var(--accent); border-color:var(--accent)}
+.stack{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:8px; min-height:280px}
+.stack h3{font-size:14px; font-family:var(--f-mono); color:var(--muted); font-weight:600; text-align:center}
+.stackcol{flex:1; display:flex; flex-direction:column-reverse; gap:6px; justify-content:flex-start}
+.scell{font:600 18px/1 var(--f-mono); text-align:center; padding:12px; border-radius:9px; border:1.5px solid currentColor; animation:drop .35s cubic-bezier(.2,.9,.3,1.2) both}
+.scell.z{color:var(--muted); background:var(--texto-soft); border-style:dashed}
+.scell.P{color:var(--tag-p); background:var(--tag-p-soft)} .scell.B{color:var(--tag-b); background:var(--tag-b-soft)} .scell.I{color:var(--tag-i); background:var(--tag-i-soft)}
+.scell.top{box-shadow:0 0 0 3px var(--card), 0 0 0 5px currentColor}
+.status{display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:14px 16px; border-radius:12px; border:1px solid var(--line); background:var(--card)}
+.status .pill{font:600 13px/1 var(--f-mono); padding:7px 10px; border-radius:999px}
+.pill.run{background:var(--accent-soft); color:var(--accent)} .pill.ok{background:var(--ok-soft); color:var(--ok)} .pill.err{background:var(--err-soft); color:var(--err)}
+.trace{font:500 13px/1.7 var(--f-mono); background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; max-height:190px; overflow:auto; white-space:pre}
+.trace .last{color:var(--accent); font-weight:600}
+.out{font:500 13px/1.6 var(--f-mono); background:#0F1726; color:#D8E1F2; border-radius:12px; padding:14px 16px; white-space:pre-wrap; overflow-x:auto}
+.out .okc{color:#5FD39B} .out .errc{color:#FF8E84}
+
+/* bombeo */
+.pump{display:flex; flex-wrap:wrap; gap:4px; align-items:center; font:600 13px/1 var(--f-mono)}
+.pump span{padding:6px 7px; border-radius:6px; border:1.5px solid currentColor}
+.pump .o{color:var(--tag-p); background:var(--tag-p-soft)} .pump .c{color:var(--ok); background:var(--ok-soft)}
+.pump .y{color:var(--err); background:var(--err-soft)}
+.pump .lbl{border:none; padding:0 4px; color:var(--muted)}
+.bars{display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:8px 12px; align-items:center; font-size:14px}
+.bar{height:14px; border-radius:7px; background:var(--accent); transition:width .3s}
+.bar.c{background:var(--ok)}
+
+/* demo */
+.demo-hero{display:flex; gap:18px; align-items:center; flex-wrap:wrap}
+.live{display:inline-flex; align-items:center; gap:8px; font:600 13px/1 var(--f-mono); color:var(--err); background:var(--err-soft); padding:8px 12px; border-radius:999px}
+.live::before{content:""; width:9px; height:9px; border-radius:50%; background:var(--err); animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.cases{display:grid; gap:8px}
+.case{display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) auto; gap:12px; align-items:center; padding:10px 12px; border-radius:10px; background:var(--card); border:1px solid var(--line)}
+@media (max-width:820px){ .case{grid-template-columns:minmax(0,1fr) auto} .case .exp{grid-column:1 / -1; order:3} }
+.case code{font-size:14px; overflow-wrap:anywhere}
+.case .exp{font:500 13px/1.4 var(--f-mono)}
+.exp.ok{color:var(--ok)} .exp.err{color:var(--err)}
+.cmd{font:600 14px/1.5 var(--f-mono); background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 14px; overflow-x:auto; white-space:nowrap}
+
+/* pipeline */
+.pipe{display:flex; align-items:stretch; gap:10px; flex-wrap:wrap}
+.pipe .blk{flex:1 1 140px; padding:16px; border-radius:12px; border:1px solid var(--line); background:var(--card); display:flex; flex-direction:column; gap:6px; min-width:0}
+.pipe .blk.fn{background:var(--accent-soft); border-color:var(--accent)}
+.pipe .blk b{font-family:var(--f-mono)} .pipe .blk span{font-size:13px; color:var(--muted)}
+.pipe .arr{align-self:center; color:var(--muted); font:600 22px/1 var(--f-mono)}
+@media (max-width:820px){ .pipe .arr{transform:rotate(90deg); margin-inline:auto} .pipe{flex-direction:column} }
+pre.code{font:500 13.5px/1.6 var(--f-mono); background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin:0; overflow-x:auto}
+pre.code .c{color:var(--muted)} pre.code .k{color:var(--accent); font-weight:600} pre.code .t{color:var(--tag-b); font-weight:600}
+
+.errc{display:flex; flex-direction:column; gap:12px; border-top:3px solid var(--err)}
+.enum{display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:var(--err-soft); color:var(--err); font:700 15px/1 var(--f-mono)}
+.emsg{font:600 13px/1.4 var(--f-mono); color:var(--err); background:var(--err-soft); padding:8px 10px; border-radius:8px}
+.pipe .blk.wide{flex:2 1 220px}
+.pipe .pill{font:600 13px/1 var(--f-mono); padding:7px 10px; border-radius:999px}
+.pipe .blk{transition:background .25s, border-color .25s, box-shadow .25s}
+.pipe .blk.lit{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+.pipe .blk.off{opacity:.4}
+.tbls{display:flex; flex-direction:column; gap:10px}
+.tbls .tok{font-size:12.5px; padding:6px 8px}
+/* navegación */
+.progress{position:fixed; top:env(safe-area-inset-top,0px); left:0; right:0; height:4px; z-index:40; background:transparent}
+.progress i{display:block; height:100%; width:0; background:var(--accent); transition:width .3s}
+.nav{position:fixed; z-index:40; right:max(16px, env(safe-area-inset-right,0px)); bottom:calc(16px + env(safe-area-inset-bottom,0px)); display:flex; gap:8px; align-items:center; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:6px; box-shadow:var(--shadow)}
+.nav button{padding:8px 11px}
+.nav .count{font:600 13px/1 var(--f-mono); color:var(--muted); min-width:58px; text-align:center; font-variant-numeric:tabular-nums}
+.navname{font:500 13px/1 var(--f-body); color:var(--muted); padding-inline:6px; max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+@media (max-width:600px){ .navname{display:none} }
+.hint{font:500 12px/1 var(--f-mono); color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="progress" aria-hidden="true"><i id="prog"></i></div>
+
+<!-- 1 PORTADA -->
+<section class="slide" id="portada" data-name="Portada">
+  <div class="wrap">
+    <div class="hero">
+      <div style="display:flex;flex-direction:column;gap:26px;min-width:0">
+        <div class="eyebrow">Proyecto Integrador 2026 · Lenguajes Formales y Autómatas</div>
+        <h1>Un analizador sintáctico para MiniHTML <span class="tag">&lt;/&gt;</span></h1>
+        <p class="lead">Gramática independiente de contexto, autómata finito con pila y simulador en C++ para validar el anidamiento de etiquetas.</p>
+        <dl class="meta">
+          <dt>Alumna</dt><dd>Ana Sofía Marenco Igarzabal</dd>
+          <dt>Docentes</dt><dd>María Lorena Bergamini · María Eugenia Bernaschini</dd>
+          <dt>Cátedra</dt><dd>A2 · Ingeniería en Informática · UCC</dd>
+          <dt>Fecha</dt><dd>Córdoba, 13 de noviembre de 2026</dd>
+        </dl>
+        <p class="hint">Usá ← → o la barra espaciadora para avanzar</p>
+      </div>
+      <div class="stackart" aria-label="Pila con Z0, P, B e I">
+        <div class="cell scell z" style="animation-delay:.1s">Z₀</div>
+        <div class="cell scell P" style="animation-delay:.35s">P</div>
+        <div class="cell scell B" style="animation-delay:.6s">B</div>
+        <div class="cell scell I top" style="animation-delay:.85s">I</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 INTRODUCCION -->
+<section class="slide" id="introduccion" data-name="Introducción">
+  <div class="wrap">
+    <div class="eyebrow"><b>01</b> Introducción</div>
+    <h2>Lenguajes como HTML organizan la información con etiquetas que abren y cierran</h2>
+    <div class="grid2">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <p class="lead">Un error típico es el <b>mal anidamiento</b>: cerrar una etiqueta antes que otra que se abrió dentro de ella.</p>
+        <div class="card" style="display:flex;flex-direction:column;gap:12px">
+          <div class="row"><span class="pill ok" style="font:600 13px/1 var(--f-mono);padding:7px 10px;border-radius:999px;min-width:96px;text-align:center">bien anidado</span><div class="toks"><span class="tok b">&lt;b&gt;</span><span class="tok i">&lt;i&gt;</span><span class="tok t">TEXTO</span><span class="tok i">&lt;/i&gt;</span><span class="tok b">&lt;/b&gt;</span></div></div>
+          <div class="row"><span class="pill err" style="font:600 13px/1 var(--f-mono);padding:7px 10px;border-radius:999px;min-width:96px;text-align:center">mal anidado</span><div class="toks"><span class="tok b">&lt;b&gt;</span><span class="tok i">&lt;i&gt;</span><span class="tok t">TEXTO</span><span class="tok bad">&lt;/b&gt;</span><span class="tok bad">&lt;/i&gt;</span></div></div>
+        </div>
+        <div class="card">
+          <h3>El problema del trabajo</h3>
+          <p>Decidir si una cadena tiene sus etiquetas bien anidadas. Lo aplicamos a <b>MiniHTML</b>, un lenguaje reducido que deja solo la estructura de anidamiento.</p>
+        </div>
+        <p>Nos basamos en la teoría de <b>Noam Chomsky</b>, que en 1956 clasificó los lenguajes según la gramática que genera cada uno. Esa clasificación es hoy la base teórica de los compiladores modernos.</p>
+      </div>
+      <div class="card">
+        <svg class="diagram" viewBox="0 0 420 330" role="img" aria-label="Jerarquía de Chomsky con MiniHTML en el tipo 2">
+          <rect x="6" y="6" width="408" height="318" rx="18" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+          <text x="22" y="32" font-size="12" fill="var(--muted)">Tipo 0 · recursivamente enumerables · Máquina de Turing</text>
+          <rect x="26" y="46" width="368" height="262" rx="16" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+          <text x="42" y="72" font-size="12" fill="var(--muted)">Tipo 1 · sensibles al contexto</text>
+          <rect x="46" y="86" width="328" height="206" rx="14" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="62" y="112" font-size="13" font-weight="600" fill="var(--accent)">Tipo 2 · independientes de contexto</text>
+          <text x="62" y="130" font-size="11.5" fill="var(--accent)">gramática G · autómata a pila M</text>
+          <rect x="66" y="150" width="170" height="120" rx="12" fill="var(--card)" stroke="var(--line)" stroke-width="1.5"/>
+          <text x="80" y="174" font-size="12" fill="var(--muted)">Tipo 3 · regulares</text>
+          <text x="80" y="192" font-size="11" fill="var(--muted)">autómata finito</text>
+          <text x="80" y="226" font-size="12" fill="var(--muted)">aⁿ…, (ab)*</text>
+          <circle cx="306" cy="214" r="9" fill="var(--accent)"/>
+          <text x="306" y="246" font-size="13" font-weight="600" text-anchor="middle" fill="var(--ink)">MiniHTML</text>
+          <text x="306" y="264" font-size="11" text-anchor="middle" fill="var(--muted)">aⁿbⁿ, ( ) balanceados</text>
+        </svg>
+      </div>
+    </div>
+    <div class="grid3">
+      <div class="card"><div class="eyebrow">Genera</div><h3>Gramática G</h3><p class="muted">Indica cómo se construye cualquier documento válido.</p></div>
+      <div class="card"><div class="eyebrow">Reconoce</div><h3>Autómata a pila M</h3><p class="muted">Decide, leyendo de izquierda a derecha, si una cadena es válida.</p></div>
+      <div class="card"><div class="eyebrow">Implementa</div><h3>Programa en C++</h3><p class="muted">Simula a M con una pila e informa el motivo de cada rechazo.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 MINIHTML -->
+<section class="slide" id="minihtml" data-name="El lenguaje MiniHTML">
+  <div class="wrap">
+    <div class="eyebrow"><b>02</b> El lenguaje MiniHTML</div>
+    <h2>Un subconjunto simplificado de HTML</h2>
+    <div class="grid2">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <p class="lead">Cada etiqueta completa se representa con un único símbolo, y cualquier texto plano con un único símbolo genérico: <span class="tok t">TEXTO</span></p>
+        <div class="card" style="display:flex;flex-direction:column;gap:16px">
+          <h3>Tres condiciones de validez</h3>
+          <div class="cond"><span class="num">1</span><div><h3>Estructura y vacuidad</h3><p class="muted">Cualquier combinación y cantidad de texto y etiquetas. La cadena vacía también es válida.</p></div></div>
+          <div class="cond"><span class="num">2</span><div><h3>Correspondencia de etiquetas</h3><p class="muted">Toda etiqueta que se abre se cierra con una de su mismo tipo: <code>&lt;b&gt;</code> con <code>&lt;/b&gt;</code>.</p></div></div>
+          <div class="cond"><span class="num">3</span><div><h3>Anidamiento LIFO</h3><p class="muted">La última etiqueta en abrirse es la primera en cerrarse. No hay cruces: si una etiqueta se abre dentro de otra, primero se cierra la de adentro y después la que la contiene.</p></div></div>
+        </div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;gap:14px">
+        <div class="row" role="group" aria-label="Elegir ejemplo">
+          <button class="chip" id="exOk" aria-pressed="true">Válido</button>
+          <button class="chip" id="exBad" aria-pressed="false">Inválido</button>
+        </div>
+        <div class="mono muted" id="exSrc" style="font-size:14px;overflow-wrap:anywhere"></div>
+        <div class="scrollx"><svg class="diagram" id="arcs" viewBox="0 0 600 170" role="img" aria-label="Arcos que unen cada apertura con su cierre"></svg></div>
+        <div class="status"><span class="pill" id="exPill"></span><span id="exMsg"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 ALFABETO -->
+<section class="slide" id="alfabeto" data-name="Alfabeto">
+  <div class="wrap">
+    <div class="eyebrow"><b>03</b> Alfabeto</div>
+    <h2>Siete símbolos: cada etiqueta completa es un solo símbolo</h2>
+    <div class="card" style="display:flex;flex-direction:column;gap:18px">
+      <div class="mono" style="font-size:clamp(16px,2.2vw,22px);font-weight:600;overflow-wrap:anywhere">Σ = { &lt;b&gt;, &lt;i&gt;, &lt;p&gt;, &lt;/b&gt;, &lt;/i&gt;, &lt;/p&gt;, TEXTO }</div>
+      <div class="grid3">
+        <div><div class="eyebrow" style="margin-bottom:10px">Aperturas</div><div class="toks"><span class="tok p">&lt;p&gt;</span><span class="tok b">&lt;b&gt;</span><span class="tok i">&lt;i&gt;</span></div></div>
+        <div><div class="eyebrow" style="margin-bottom:10px">Cierres</div><div class="toks"><span class="tok p">&lt;/p&gt;</span><span class="tok b">&lt;/b&gt;</span><span class="tok i">&lt;/i&gt;</span></div></div>
+        <div><div class="eyebrow" style="margin-bottom:10px">Texto plano</div><div class="toks"><span class="tok t">TEXTO</span></div></div>
+      </div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      <h3>Probalo: del texto a los símbolos de Σ</h3>
+      <p class="muted">Así trabaja el análisis léxico del programa. Cada palabra de texto se convierte en un TEXTO.</p>
+      <label for="lexIn" class="hint">Escribí un documento</label>
+      <input type="text" id="lexIn" value="<p>Hola <b>estudiantes <i>UCC</i></b></p>" spellcheck="false" autocomplete="off">
+      <div class="toks" id="lexOut" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 GRAMATICA -->
+<section class="slide" id="gramatica" data-name="Gramática">
+  <div class="wrap">
+    <div class="eyebrow"><b>04</b> Gramática independiente de contexto</div>
+    <h2>Una gramática con cuatro componentes y seis producciones</h2>
+    <div class="grid2">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="card" style="display:flex;flex-direction:column;gap:16px">
+          <div class="mono" style="font-size:clamp(22px,3vw,30px);font-weight:600">G = (<span class="v">V</span>, Σ, <span class="v">S</span>, P)</div>
+          <dl class="gdef">
+            <dt>V = { S, E }</dt><dd>Variables. <b>S</b> es una secuencia de elementos; <b>E</b> es un elemento: un texto o una etiqueta con su contenido.</dd>
+            <dt>Σ</dt><dd>Terminales: los 7 símbolos del alfabeto, <code>&lt;b&gt; &lt;i&gt; &lt;p&gt; &lt;/b&gt; &lt;/i&gt; &lt;/p&gt; TEXTO</code>.</dd>
+            <dt>S</dt><dd>Símbolo inicial.</dd>
+            <dt>P</dt><dd>Las seis producciones de la derecha.</dd>
+          </dl>
+        </div>
+        <p class="hint">Tocá cada producción para ver su justificación</p>
+      </div>
+      <div class="prods" id="prodList">
+        <div class="pgroup">Producciones de S · estructura de secuencias de cualquier longitud</div>
+        <div class="prod" data-r="1"><button class="ph" aria-expanded="false"><span class="n">(1)</span><span class="r"><span class="v">S</span> → <span class="v">E</span> <span class="v">S</span></span><span class="plus" aria-hidden="true">+</span></button><div class="pop" hidden><p><b>Recursión por derecha.</b> En cada iteración se añade un nuevo elemento E a la cadena y vuelve a quedar una S para continuar.</p><p class="muted">Junto con (2), S se encarga de la estructura: secuencias de cualquier longitud. Al ser por derecha, un analizador descendente no entra en un ciclo infinito.</p></div></div>
+        <div class="prod" data-r="2"><button class="ph" aria-expanded="false"><span class="n">(2)</span><span class="r"><span class="v">S</span> → λ</span><span class="plus" aria-hidden="true">+</span></button><div class="pop" hidden><p><b>La secuencia finaliza.</b> λ es la cadena vacía.</p><p class="muted">Permite el documento vacío y etiquetas sin contenido, como <code>&lt;b&gt;&lt;/b&gt;</code>.</p></div></div>
+        <div class="pgroup">Producciones de E · los elementos</div>
+        <div class="prod" data-r="3"><button class="ph" aria-expanded="false"><span class="n">(3)</span><span class="r"><span class="v">E</span> → TEXTO</span><span class="plus" aria-hidden="true">+</span></button><div class="pop" hidden><p><b>Elemento válido por sí mismo.</b> Establece el texto plano, que puede aparecer en cualquier posición.</p></div></div>
+        <div class="prod" data-r="4"><button class="ph" aria-expanded="false"><span class="n">(4)</span><span class="r"><span class="v">E</span> → &lt;p&gt; <span class="v">S</span> &lt;/p&gt;</span><span class="plus" aria-hidden="true">+</span></button><div class="pop" hidden><p><b>Garantiza formalmente el correcto anidamiento</b> del párrafo.</p><p class="muted">La apertura y su cierre se generan en el mismo paso, así que siempre son del mismo tipo. La S del medio obliga a cerrar todo lo de adentro antes: ese es el orden LIFO.</p><p class="muted">Además, la variable queda entre dos terminales, algo que una gramática regular (A → aB) no permite.</p></div></div>
+        <div class="prod" data-r="5"><button class="ph" aria-expanded="false"><span class="n">(5)</span><span class="r"><span class="v">E</span> → &lt;b&gt; <span class="v">S</span> &lt;/b&gt;</span><span class="plus" aria-hidden="true">+</span></button><div class="pop" hidden><p><b>Garantiza formalmente el correcto anidamiento</b> de la negrita.</p><p class="muted">Mismo razonamiento que (4): apertura y cierre del mismo tipo en un solo paso, y la S del medio se cierra antes que <code>&lt;/b&gt;</code>.</p></div></div>
+        <div class="prod" data-r="6"><button class="ph" aria-expanded="false"><span class="n">(6)</span><span class="r"><span class="v">E</span> → &lt;i&gt; <span class="v">S</span> &lt;/i&gt;</span><span class="plus" aria-hidden="true">+</span></button><div class="pop" hidden><p><b>Garantiza formalmente el correcto anidamiento</b> de la cursiva.</p><p class="muted">Mismo razonamiento que (4): apertura y cierre del mismo tipo en un solo paso, y la S del medio se cierra antes que <code>&lt;/i&gt;</code>.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 AUTOMATA -->
+<section class="slide" id="automata" data-name="Autómata a pila">
+  <div class="wrap">
+    <div class="eyebrow"><b>05</b> Autómata finito con pila</div>
+    <h2>M = (Σ, Γ, Q, q₀, Z₀, F, Δ): dos estados y una pila</h2>
+    <div class="row">
+      <span class="badge">Γ = { Z₀, P, B, I }</span><span class="badge">Q = { q₀, q₁ }</span><span class="badge">F = { q₁ }</span><span class="badge">acepta por estado final</span>
+    </div>
+    <div class="card scrollx" style="padding:14px">
+      <svg class="diagram" id="apDiag" viewBox="0 0 900 270" style="min-width:640px" role="img" aria-label="Diagrama de transiciones: bucle en q0 con t1 a t7 agrupadas en abrir, texto y cerrar, y transición lambda t8 hacia el estado final q1">
+        <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker>
+        <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>
+        <rect x="296" y="14" width="178" height="118" rx="12" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.3"/>
+        <text x="312" y="40" font-size="12" font-weight="600" fill="var(--accent)">ABRIR · apila</text>
+        <rect x="490" y="14" width="162" height="118" rx="12" fill="var(--texto-soft)" stroke="var(--texto)" stroke-width="1.3"/>
+        <text x="506" y="40" font-size="12" font-weight="600" fill="var(--texto)">TEXTO · igual</text>
+        <rect x="668" y="14" width="196" height="118" rx="12" fill="var(--ok-soft)" stroke="var(--ok)" stroke-width="1.3"/>
+        <text x="684" y="40" font-size="12" font-weight="600" fill="var(--ok)">CERRAR · desapila</text>
+        <g font-size="13.5" fill="var(--ink)">
+          <text id="lT1" x="312" y="68">t1 · &lt;p&gt;, X, PX</text>
+          <text id="lT2" x="312" y="92">t2 · &lt;b&gt;, X, BX</text>
+          <text id="lT3" x="312" y="116">t3 · &lt;i&gt;, X, IX</text>
+          <text id="lT4" x="506" y="68">t4 · TEXTO, X, X</text>
+          <text id="lT5" x="684" y="68">t5 · &lt;/p&gt;, P, λ</text>
+          <text id="lT6" x="684" y="92">t6 · &lt;/b&gt;, B, λ</text>
+          <text id="lT7" x="684" y="116">t7 · &lt;/i&gt;, I, λ</text>
+        </g>
+        <path d="M296 74 C262 74 236 86 222 104" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="4 4"/>
+        <path id="eLoop" d="M182 172 C140 70 260 70 218 172" fill="none" stroke="var(--muted)" stroke-width="1.8" marker-end="url(#ar)"/>
+        <path d="M40 200 H166" stroke="var(--muted)" stroke-width="1.8" marker-end="url(#ar)"/><text x="46" y="190" font-size="12" fill="var(--muted)">inicio</text>
+        <circle cx="200" cy="200" r="32" fill="var(--card)" stroke="var(--ink)" stroke-width="1.8"/>
+        <text x="200" y="206" font-size="18" font-weight="600" text-anchor="middle" fill="var(--ink)">q₀</text>
+        <path id="eLam" d="M234 200 H722" stroke="var(--muted)" stroke-width="1.8" marker-end="url(#ar)"/>
+        <text id="lT8" x="478" y="190" font-size="13.5" text-anchor="middle" fill="var(--ink)">t8 · λ, Z₀, Z₀  (terminó y no queda nada abierto)</text>
+        <circle cx="758" cy="200" r="32" fill="var(--ok-soft)" stroke="var(--ok)" stroke-width="2"/>
+        <circle cx="758" cy="200" r="26" fill="none" stroke="var(--ok)" stroke-width="1.4"/>
+        <text x="758" y="206" font-size="18" font-weight="600" text-anchor="middle" fill="var(--ink)">q₁</text>
+        <text x="758" y="252" font-size="12" text-anchor="middle" fill="var(--ok)">acepta</text>
+        <text x="40" y="258" font-size="12" fill="var(--muted)">Cómo leer un rótulo: símbolo leído, tope de la pila, lo que queda en su lugar · X ∈ Γ</text>
+      </svg>
+    </div>
+    <div class="eyebrow" style="color:var(--err)">Si no hay transición posible (Δ = ∅), el autómata se traba y rechaza · tres casos</div>
+    <div class="grid3">
+      <div class="card errc"><div class="row" style="gap:10px"><span class="enum">1</span><h3 style="margin:0">Cierre que no coincide</h3></div>
+        <div class="toks"><span class="tok p">&lt;p&gt;</span><span class="tok b">&lt;b&gt;</span><span class="tok t">TEXTO</span><span class="tok bad">&lt;/p&gt;</span></div>
+        <div class="mono" style="font-size:14px">Δ(q₀, &lt;/p&gt;, <b>B</b>) = ∅</div>
+        <div class="emsg">se esperaba &lt;/b&gt; pero llego &lt;/p&gt;</div></div>
+      <div class="card errc"><div class="row" style="gap:10px"><span class="enum">2</span><h3 style="margin:0">Cierre sin apertura</h3></div>
+        <div class="toks"><span class="tok t">TEXTO</span><span class="tok bad">&lt;/b&gt;</span></div>
+        <div class="mono" style="font-size:14px">Δ(q₀, &lt;/b&gt;, <b>Z₀</b>) = ∅</div>
+        <div class="emsg">&lt;/b&gt; no tiene etiqueta de apertura</div></div>
+      <div class="card errc"><div class="row" style="gap:10px"><span class="enum">3</span><h3 style="margin:0">Etiqueta sin cerrar</h3></div>
+        <div class="toks"><span class="tok p">&lt;p&gt;</span><span class="tok t">TEXTO</span><span class="tok bad">fin</span></div>
+        <div class="mono" style="font-size:14px">Δ(q₀, λ, <b>P</b>) = ∅</div>
+        <div class="emsg">termino la entrada y falta &lt;/p&gt;</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 SIMULADOR -->
+<section class="slide" id="simulador" data-name="Simulador del autómata">
+  <div class="wrap">
+    <div class="eyebrow"><b>06</b> Trazas de configuraciones instantáneas</div>
+    <h2>El autómata, paso a paso</h2>
+    <div class="row" id="simPresets" role="group" aria-label="Cadenas de ejemplo"></div>
+    <div class="row">
+      <label for="simIn" class="hint" style="flex-basis:100%">Cadena de entrada</label>
+      <div style="flex:1 1 320px;min-width:0"><input type="text" id="simIn" spellcheck="false" autocomplete="off"></div>
+      <button id="simBack">← Paso</button>
+      <button class="primary" id="simNext">Paso →</button>
+      <button id="simPlay">▶ Ejecutar</button>
+      <button id="simReset">Reiniciar</button>
+    </div>
+    <div class="sim">
+      <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+        <div class="card" style="padding:14px 16px"><div class="hint">Cinta de entrada</div><div class="tape" id="simTape"></div></div>
+        <div class="status" aria-live="polite"><span class="pill run" id="simPill">q₀</span><span id="simMsg"></span></div>
+        <div class="trace" id="simTrace"></div>
+      </div>
+      <div class="stack"><h3>PILA</h3><div class="stackcol" id="simStack"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 PROGRAMA -->
+<section class="slide" id="programa" data-name="El programa">
+  <div class="wrap">
+    <div class="eyebrow"><b>07</b> Implementación en C++</div>
+    <h2>El programa simula el autómata en dos etapas</h2>
+    <p class="lead">Toma lo que escribe el usuario, lo convierte en símbolos del alfabeto y los recorre con una pila. Al final decide si la cadena es válida o inválida y, si es inválida, dice por qué.</p>
+    <div class="pipe" id="pipe" aria-live="polite">
+      <div class="blk" data-i="0"><b>Cadena</b><span class="mono" id="ppIn" style="overflow-wrap:anywhere"></span></div>
+      <div class="arr">→</div>
+      <div class="blk fn" data-i="1"><b>1 · separarTokens</b><span>análisis léxico</span></div>
+      <div class="arr">→</div>
+      <div class="blk wide" data-i="2"><b>Tokens</b><div class="toks" id="ppTok"></div></div>
+      <div class="arr">→</div>
+      <div class="blk fn" data-i="3"><b>2 · simularAP</b><span>análisis sintáctico</span></div>
+      <div class="arr">→</div>
+      <div class="blk" data-i="4"><b>Resultado</b><span class="pill" id="ppRes" style="align-self:flex-start"></span><span id="ppMsg" style="font-size:13px"></span></div>
+    </div>
+    <div class="row">
+      <label for="ppInput" class="hint">Probalo</label>
+      <div style="flex:1 1 280px;min-width:0"><input type="text" id="ppInput" value="<p>Hola <b>mundo</b></p>" spellcheck="false" autocomplete="off"></div>
+      <div class="row" id="ppPresets" role="group" aria-label="Ejemplos"></div>
+    </div>
+    <div class="grid3">
+      <div class="card" style="display:flex;flex-direction:column;gap:12px">
+        <div class="eyebrow">Herramientas</div>
+        <ul class="clean">
+          <li><span><code>vector</code> → la lista de tokens</span></li>
+          <li><span><code>stack</code> → la pila del autómata</span></li>
+          <li><span><code>map</code> → las dos tablas de etiquetas</span></li>
+        </ul>
+        <div class="tbls">
+          <div><div class="hint">APERTURA · qué apila</div><div class="toks"><span class="tok p">&lt;p&gt;→P</span><span class="tok b">&lt;b&gt;→B</span><span class="tok i">&lt;i&gt;→I</span></div></div>
+          <div><div class="hint">CIERRE · qué debe estar en el tope</div><div class="toks"><span class="tok p">&lt;/p&gt;→P</span><span class="tok b">&lt;/b&gt;→B</span><span class="tok i">&lt;/i&gt;→I</span></div></div>
+        </div>
+        <p class="muted" style="font-size:14px"><code>cierreDe</code> hace el camino inverso (P → &lt;/p&gt;) y se usa en los mensajes de error.</p>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;gap:12px">
+        <div class="eyebrow">Etapa 1 · separarTokens</div>
+        <ul class="clean">
+          <li><span>Recorre lo que escribió el usuario letra por letra.</span></li>
+          <li><span>Junta las letras en una palabra. Cuando aparece un espacio o empieza una etiqueta, la guarda como <b>TEXTO</b>.</span></li>
+          <li><span>Con un <code>&lt;</code> sabe que empieza una etiqueta y busca el <code>&gt;</code>. Si no lo encuentra, hay error léxico.</span></li>
+          <li><span>Si es una apertura o un cierre de las tablas, la guarda como token. Si no, error léxico: etiqueta desconocida.</span></li>
+        </ul>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;gap:12px">
+        <div class="eyebrow">Etapa 2 · simularAP</div>
+        <ul class="clean">
+          <li><span>Pone <b>Z0</b> en el fondo de la pila: no hay nada abierto.</span></li>
+          <li><span><b>TEXTO</b>: no hace nada (t4). <b>Apertura</b>: apila P, B o I (t1–t3).</span></li>
+          <li><span><b>Cierre</b>: si arriba está Z0 → error 2. Si no coincide → error 1. Si coincide, desapila (t5–t7).</span></li>
+          <li><span>Al final, si arriba quedó Z0 → <b>VÁLIDA</b> (t8). Si no → error 3.</span></li>
+        </ul>
+      </div>
+    </div>
+    <p class="muted" style="font-size:14px"><code>analizar</code> une las dos etapas: si separarTokens encuentra un error léxico, muestra INVÁLIDA y ni siquiera usa la pila.</p>
+  </div>
+</section>
+
+<!-- 11 DEMO -->
+<section class="slide" id="demo" data-name="Demo en vivo">
+  <div class="wrap">
+    <div class="demo-hero"><span class="live">Demo en vivo</span><span class="eyebrow"><b>08</b> Pausa para mostrar el programa</span></div>
+    <h2>Probemos el analizador con cadenas reales</h2>
+    <div class="grid2">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="hint">1 · Compilar</div>
+        <div class="cmd">g++ -std=c++11 -o minihtml minihtml.cpp</div>
+        <div class="hint">2 · Ejecutar</div>
+        <div class="cmd">./minihtml   <span class="muted">(en Windows: minihtml.exe)</span></div>
+        <div class="hint">3 · Comandos</div>
+        <div class="cmd">pruebas <span class="muted">· corre las 10 cadenas</span>   salir</div>
+        <div class="card"><h3>Modificación en vivo</h3><p class="muted">Agregar <code>{"&lt;u&gt;", "U"}</code> y <code>{"&lt;/u&gt;", "U"}</code>, recompilar y probar <code>&lt;p&gt;&lt;u&gt;TEXTO&lt;/u&gt;&lt;/p&gt;</code>.</p></div>
+      </div>
+      <div class="cases" id="cases"></div>
+    </div>
+  </div>
+</section>
+
+<nav class="nav" aria-label="Navegación de la presentación">
+  <button id="prev" aria-label="Diapositiva anterior">←</button>
+  <span class="count" id="count">1 / 11</span>
+  <span class="navname" id="navname"></span>
+  <button id="next" aria-label="Diapositiva siguiente">→</button>
+</nav>
+
+<script>
+(function(){
+"use strict";
+var $ = function(id){ return document.getElementById(id); };
+var esc = function(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
+
+/* ---------- Alfabeto y análisis léxico (igual que separarTokens) ---------- */
+var APERTURA = {"<p>":"P","<b>":"B","<i>":"I"};
+var CIERRE   = {"</p>":"P","</b>":"B","</i>":"I"};
+var TID = {"<p>":"t1","<b>":"t2","<i>":"t3","TEXTO":"t4","</p>":"t5","</b>":"t6","</i>":"t7"};
+function cls(t){ if(t==="TEXTO") return "t"; var m=t.match(/[pbi]/); return m?m[0]:"t"; }
+function cierreDe(s){ for(var k in CIERRE) if(CIERRE[k]===s) return k; return "?"; }
+function separarTokens(entrada){
+  var tokens=[], palabra="";
+  for(var i=0;i<entrada.length;i++){
+    var c=entrada[i];
+    if(c==="<"){
+      if(palabra!==""){ tokens.push("TEXTO"); palabra=""; }
+      var fin=entrada.indexOf(">", i);
+      if(fin===-1) return {tokens:tokens, error:"Error lexico: falta '>' en una etiqueta"};
+      var et=entrada.substring(i, fin+1);
+      if(!(et in APERTURA) && !(et in CIERRE)) return {tokens:tokens, error:"Error lexico: etiqueta desconocida "+et, bad:et};
+      tokens.push(et); i=fin;
+    } else if(c===" "){
+      if(palabra!==""){ tokens.push("TEXTO"); palabra=""; }
+    } else palabra+=c;
+  }
+  if(palabra!=="") tokens.push("TEXTO");
+  return {tokens:tokens, error:null};
+}
+
+/* ---------- Simulación del autómata (igual que simularAP) ---------- */
+var sub = function(s){ return s.replace(/q0/g,"q₀").replace(/q1/g,"q₁").replace(/Z0/g,"Z₀"); };
+function cfg(state, toks, pos, stack){
+  var rest = pos>=toks.length ? "λ" : toks.slice(pos).join(" ");
+  return "("+state+", "+rest+", "+stack.slice().reverse().join("")+")";
+}
+function simular(tokens){
+  var stack=["Z0"], steps=[{pos:0, stack:["Z0"], state:"q0", t:null, conf:cfg("q0",tokens,0,stack), msg:"Configuración inicial (q₀, w, Z₀)"}];
+  for(var k=0;k<tokens.length;k++){
+    var t=tokens[k], top=stack[stack.length-1], pos="token "+(k+1);
+    if(t==="TEXTO"){ }
+    else if(t in APERTURA){ stack.push(APERTURA[t]); }
+    else {
+      if(top==="Z0"){ steps.push({pos:k, stack:stack.slice(), state:"q0", t:null, fail:true, conf:"Δ(q₀, "+t+", Z₀) = ∅", msg:pos+": "+t+" no tiene etiqueta de apertura"}); return steps; }
+      if(top!==CIERRE[t]){ steps.push({pos:k, stack:stack.slice(), state:"q0", t:null, fail:true, conf:"Δ(q₀, "+t+", "+top+") = ∅", msg:pos+": se esperaba "+cierreDe(top)+" pero llego "+t}); return steps; }
+      stack.pop();
+    }
+    var accion = t==="TEXTO" ? "la pila no cambia" : (t in APERTURA ? "apila "+APERTURA[t] : "desapila "+CIERRE[t]);
+    steps.push({pos:k+1, stack:stack.slice(), state:"q0", t:TID[t], conf:"⊢ "+cfg("q0",tokens,k+1,stack), msg:TID[t]+": lee "+t+", "+accion});
+  }
+  if(stack[stack.length-1]!=="Z0"){
+    steps.push({pos:tokens.length, stack:stack.slice(), state:"q0", t:null, fail:true, conf:"Δ(q₀, λ, "+stack[stack.length-1]+") = ∅", msg:"termino la entrada y falta "+cierreDe(stack[stack.length-1])});
+    return steps;
+  }
+  steps.push({pos:tokens.length, stack:stack.slice(), state:"q1", t:"t8", ok:true, conf:"⊢ "+cfg("q1",tokens,tokens.length,stack), msg:"t8: λ, Z₀ → q₁ ∈ F. La cadena pertenece a L(M)"});
+  return steps;
+}
+
+/* ---------- Diapositiva MiniHTML: arcos ---------- */
+var EX = {
+  ok:{src:"<p>Hola <b>estudiantes <i>UCC</i></b></p>", toks:["<p>","TEXTO","<b>","TEXTO","<i>","TEXTO","</i>","</b>","</p>"]},
+  bad:{src:"<p><b>Error de anidamiento</p></b>", toks:["<p>","<b>","TEXTO","TEXTO","TEXTO","</p>","</b>"]}
+};
+function drawArcs(which){
+  var e=EX[which], svg=$("arcs"), x=10, pos=[];
+  e.toks.forEach(function(t){ var w=t.length*9.2+18; pos.push({x:x,w:w}); x+=w+8; });
+  var W=Math.max(600,x+10), base=130, h="";
+  // pares por tipo (como si cada cierre buscara su apertura del mismo tipo)
+  var open={}, pairs=[];
+  e.toks.forEach(function(t,i){ if(t in APERTURA){ (open[t]=open[t]||[]).push(i);} else if(t in CIERRE){ var o=t.replace("/",""); var a=(open[o]||[]).pop(); if(a!==undefined) pairs.push([a,i]); } });
+  var crossing=function(p,q){ return (p[0]<q[0]&&q[0]<p[1]&&p[1]<q[1])||(q[0]<p[0]&&p[0]<q[1]&&q[1]<p[1]); };
+  pairs.forEach(function(p){
+    var bad=pairs.some(function(q){ return q!==p && crossing(p,q); });
+    var x1=pos[p[0]].x+pos[p[0]].w/2, x2=pos[p[1]].x+pos[p[1]].w/2, hgt=Math.min(100, 26+(x2-x1)*0.22);
+    var col = bad ? "var(--err)" : "var(--tag-"+cls(e.toks[p[0]])+")";
+    h+='<path d="M'+x1+' '+(base-18)+' C'+x1+' '+(base-18-hgt)+' '+x2+' '+(base-18-hgt)+' '+x2+' '+(base-18)+'" fill="none" stroke="'+col+'" stroke-width="2.2"'+(bad?' stroke-dasharray="6 5"':'')+'/>';
+  });
+  e.toks.forEach(function(t,i){
+    var c=cls(t), p=pos[i];
+    var col=c==="t"?"var(--texto)":"var(--tag-"+c+")", bg=c==="t"?"var(--texto-soft)":"var(--tag-"+c+"-soft)";
+    h+='<rect x="'+p.x+'" y="'+(base-16)+'" width="'+p.w+'" height="30" rx="7" fill="'+bg+'" stroke="'+col+'" stroke-width="1.5"/>';
+    h+='<text x="'+(p.x+p.w/2)+'" y="'+(base+4)+'" font-size="13" font-weight="600" text-anchor="middle" fill="'+col+'">'+esc(t)+'</text>';
+  });
+  svg.setAttribute("viewBox","0 0 "+W+" 160"); svg.innerHTML=h;
+  $("exSrc").textContent=e.src;
+  var bad = which==="bad";
+  $("exPill").className="pill "+(bad?"err":"ok"); $("exPill").textContent=bad?"inválido":"válido";
+  $("exMsg").textContent = bad ? "Los arcos de <p> y <b> se cruzan: </p> llega cuando la última abierta es <b>." : "Los arcos quedan uno dentro del otro: <i> cierra antes que <b>, y <b> antes que <p>.";
+  $("exOk").setAttribute("aria-pressed", String(!bad)); $("exBad").setAttribute("aria-pressed", String(bad));
+}
+$("exOk").onclick=function(){ drawArcs("ok"); }; $("exBad").onclick=function(){ drawArcs("bad"); };
+drawArcs("ok");
+
+/* ---------- Alfabeto: tokenizador en vivo ---------- */
+function renderLex(){
+  var r=separarTokens($("lexIn").value), out=$("lexOut");
+  var h=r.tokens.map(function(t){ return '<span class="tok '+cls(t)+'">'+esc(t)+'</span>'; }).join("");
+  if(r.error) h+='<span class="tok bad">'+esc(r.error)+'</span>';
+  if(!r.tokens.length && !r.error) h='<span class="muted">λ (cadena vacía)</span>';
+  out.innerHTML=h;
+}
+$("lexIn").addEventListener("input", renderLex); renderLex();
+
+/* ---------- Producciones desplegables ---------- */
+[].forEach.call(document.querySelectorAll("#prodList .ph"), function(b){
+  b.onclick=function(){ var open=b.getAttribute("aria-expanded")!=="true"; b.setAttribute("aria-expanded", String(open)); b.nextElementSibling.hidden=!open; b.parentNode.classList.toggle("open", open); };
+});
+
+/* ---------- Simulador del autómata ---------- */
+var SIM_PRESETS = [
+  ["α","<p> TEXTO <b> TEXTO </b> </p>"],["β","<p> TEXTO <b> TEXTO </b> <i> TEXTO </i> </p>"],["γ","<p> TEXTO TEXTO </p> <i> TEXTO </i>"],
+  ["anidamiento","<p><b>Error de anidamiento</p></b>"],["sin apertura","TEXTO </b>"],["sin cerrar","<p> TEXTO"]];
+var sim={toks:[], steps:[], k:0, timer:null, lexErr:null};
+function loadSim(str){
+  stopPlay(); $("simIn").value=str; var r=separarTokens(str);
+  sim.toks=r.tokens; sim.lexErr=r.error; sim.steps=r.error?[]:simular(r.tokens); sim.k=0; renderSim();
+  [].forEach.call($("simPresets").children,function(b){ b.setAttribute("aria-pressed", String(b.dataset.s===str)); });
+}
+function renderSim(){
+  var tape=$("simTape"), pill=$("simPill"), msg=$("simMsg");
+  if(sim.lexErr){
+    tape.innerHTML=sim.toks.map(function(t){return '<span class="tok '+cls(t)+'">'+esc(t)+'</span>';}).join("")+'<span class="tok bad">?</span>';
+    pill.className="pill err"; pill.textContent="error léxico"; msg.textContent=sim.lexErr;
+    $("simStack").innerHTML='<div class="scell z top">Z₀</div>'; $("simTrace").textContent="El análisis léxico rechaza la cadena: el autómata no llega a ejecutarse."; hlT(null); return;
+  }
+  var st=sim.steps[sim.k], last=sim.k===sim.steps.length-1;
+  var h=sim.toks.map(function(t,i){ var c="tok "+cls(t); if(i<st.pos) c+=" read"; if(i===st.pos && !st.ok) c+=" head"; if(st.fail&&i===st.pos&&st.pos<sim.toks.length) c+=" bad"; return '<span class="'+c+'">'+esc(t)+'</span>'; }).join("");
+  h+='<span class="end'+(st.pos>=sim.toks.length?' head':'')+'">fin</span>';
+  tape.innerHTML=h;
+  var head=tape.querySelector(".head"); if(head) tape.scrollLeft=Math.max(0, head.offsetLeft-tape.clientWidth/2);
+  $("simStack").innerHTML=st.stack.map(function(s,i){ return '<div class="scell '+(s==="Z0"?"z":s)+(i===st.stack.length-1?" top":"")+'">'+sub(s)+'</div>'; }).join("");
+  if(st.fail){ pill.className="pill err"; pill.textContent="rechaza"; }
+  else if(st.ok){ pill.className="pill ok"; pill.textContent="q₁ · acepta"; }
+  else { pill.className="pill run"; pill.textContent="q₀ · paso "+sim.k+"/"+(sim.steps.length-1); }
+  msg.textContent=st.msg;
+  $("simTrace").innerHTML=sim.steps.slice(0,sim.k+1).map(function(s,i){ return '<span'+(i===sim.k?' class="last"':'')+'>'+esc(sub(s.conf))+(s.t?"   ["+s.t+"]":"")+'</span>'; }).join("\n");
+  $("simTrace").scrollTop=1e6;
+  hlT(st.t);
+  if(last) stopPlay();
+}
+function hlT(t){
+  for(var j=1;j<=8;j++){ var el=$("lT"+j); if(el){ el.setAttribute("fill", "t"+j===t ? "var(--accent)" : "var(--ink)"); el.setAttribute("font-weight", "t"+j===t ? "700":"400"); } }
+  $("eLoop").setAttribute("stroke", t && t!=="t8" ? "var(--accent)" : "var(--muted)"); $("eLoop").setAttribute("marker-end", t && t!=="t8" ? "url(#arA)" : "url(#ar)");
+  $("eLam").setAttribute("stroke", t==="t8" ? "var(--accent)" : "var(--muted)"); $("eLam").setAttribute("marker-end", t==="t8" ? "url(#arA)" : "url(#ar)");
+  [].forEach.call(document.querySelectorAll("#tblDelta tbody tr"), function(r){ r.classList.toggle("hl", r.dataset.t===t); });
+}
+function stopPlay(){ if(sim.timer){ clearInterval(sim.timer); sim.timer=null; } $("simPlay").textContent="▶ Ejecutar"; }
+SIM_PRESETS.forEach(function(p){ var b=document.createElement("button"); b.className="chip"; b.textContent=p[0]; b.dataset.s=p[1]; b.title=p[1]; b.onclick=function(){ loadSim(p[1]); }; $("simPresets").appendChild(b); });
+$("simIn").addEventListener("change", function(){ loadSim($("simIn").value); });
+$("simIn").addEventListener("keydown", function(e){ if(e.key==="Enter"){ loadSim($("simIn").value); } });
+$("simNext").onclick=function(){ if(!sim.lexErr && sim.k<sim.steps.length-1){ sim.k++; renderSim(); } };
+$("simBack").onclick=function(){ stopPlay(); if(sim.k>0){ sim.k--; renderSim(); } };
+$("simReset").onclick=function(){ stopPlay(); sim.k=0; renderSim(); };
+$("simPlay").onclick=function(){
+  if(sim.timer){ stopPlay(); return; }
+  if(sim.lexErr) return; if(sim.k>=sim.steps.length-1) sim.k=0;
+  $("simPlay").textContent="❚❚ Pausa"; renderSim();
+  sim.timer=setInterval(function(){ if(sim.k<sim.steps.length-1){ sim.k++; renderSim(); } else stopPlay(); }, 850);
+};
+loadSim(SIM_PRESETS[0][1]);
+
+/* ---------- Diapositiva del programa: recorrido en vivo ---------- */
+var ppTimers=[];
+function runPipe(str){
+  ppTimers.forEach(clearTimeout); ppTimers=[];
+  var blks=[].slice.call(document.querySelectorAll("#pipe .blk"));
+  blks.forEach(function(b){ b.classList.remove("lit","off"); });
+  $("ppIn").textContent = str===""?"(vacía)":str;
+  var r=separarTokens(str), res=$("ppRes"), msg=$("ppMsg");
+  var h=r.tokens.map(function(t){ return '<span class="tok '+cls(t)+'">'+esc(t)+'</span>'; }).join("");
+  if(r.error) h+='<span class="tok bad">?</span>';
+  if(!r.tokens.length && !r.error) h='<span class="muted">λ</span>';
+  $("ppTok").innerHTML=h;
+  if(r.error){ res.className="pill err"; res.textContent="INVÁLIDA"; msg.textContent=r.error; }
+  else { var st=simular(r.tokens), last=st[st.length-1];
+    if(last.ok){ res.className="pill ok"; res.textContent="VÁLIDA"; msg.textContent="pertenece a L(M)"; }
+    else { res.className="pill err"; res.textContent="INVÁLIDA"; msg.textContent=last.msg; } }
+  var order = r.error ? [0,1,2,4] : [0,1,2,3,4];
+  if(r.error){ blks[3].classList.add("off"); }
+  var reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  order.forEach(function(i,k){ ppTimers.push(setTimeout(function(){ blks.forEach(function(b){ b.classList.remove("lit"); }); blks[i].classList.add("lit"); }, reduce?0:k*420)); });
+}
+[["válida","<p>Hola <b>mundo</b></p>"],["mal anidada","<p><b>TEXTO</p></b>"],["sin cerrar","<p> TEXTO"],["desconocida","<pola>"]].forEach(function(p){
+  var b=document.createElement("button"); b.className="chip"; b.textContent=p[0]; b.title=p[1];
+  b.onclick=function(){ $("ppInput").value=p[1]; runPipe(p[1]); }; $("ppPresets").appendChild(b); });
+$("ppInput").addEventListener("input", function(){ runPipe($("ppInput").value); });
+runPipe($("ppInput").value);
+
+/* ---------- Demo: cadenas para probar ---------- */
+var CASES=[
+  ["<p> TEXTO <b> TEXTO </b> </p>","VALIDA (α)",true],
+  ["<p> TEXTO TEXTO </p> <i> TEXTO </i>","VALIDA (γ)",true],
+  ["<p>Hola <b>estudiantes <i>UCC</i></b></p>","VALIDA",true],
+  ["","VALIDA (vacía: solo Enter)",true],
+  ["<p><b>Error de anidamiento</p></b>","token 6: se esperaba </b> pero llego </p>",false],
+  ["TEXTO </b>","token 2: </b> no tiene etiqueta de apertura",false],
+  ["<p> TEXTO","termino la entrada y falta </p>",false],
+  ["<u> TEXTO </u>","Error lexico: etiqueta desconocida <u>",false],
+  ["<p TEXTO","Error lexico: falta '>' en una etiqueta",false]];
+CASES.forEach(function(c){
+  var d=document.createElement("div"); d.className="case";
+  d.innerHTML='<code>'+(c[0]?esc(c[0]):'<span class="muted">(vacía)</span>')+'</code><span class="exp '+(c[2]?'ok':'err')+'">'+esc(c[1])+'</span>';
+  var b=document.createElement("button"); b.textContent="Copiar"; b.className="chip";
+  b.onclick=function(){ var done=function(){ b.textContent="Copiada"; setTimeout(function(){ b.textContent="Copiar"; },1400); };
+    try{ navigator.clipboard.writeText(c[0]).then(done, function(){ b.textContent="Copiá a mano"; }); }catch(e){ b.textContent="Copiá a mano"; } };
+  d.appendChild(b); $("cases").appendChild(d);
+});
+
+/* ---------- Navegación ---------- */
+var slides=[].slice.call(document.querySelectorAll(".slide")), cur=0;
+function go(i){ i=Math.max(0,Math.min(slides.length-1,i)); slides[i].scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto":"smooth"}); }
+function setCur(i){ cur=i; $("count").textContent=(i+1)+" / "+slides.length; $("navname").textContent=slides[i].dataset.name; $("prog").style.width=(100*(i+1)/slides.length)+"%"; }
+var io=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting && e.intersectionRatio>0.5) setCur(slides.indexOf(e.target)); }); },{threshold:[0.5,0.75]});
+slides.forEach(function(s){ io.observe(s); });
+$("prev").onclick=function(){ go(cur-1); }; $("next").onclick=function(){ go(cur+1); };
+document.addEventListener("keydown", function(e){
+  var tag=(e.target.tagName||"").toLowerCase(); if(tag==="input"||tag==="textarea") return;
+  if(["ArrowRight","PageDown"," "].indexOf(e.key)>=0){ e.preventDefault(); go(cur+1); }
+  else if(["ArrowLeft","PageUp"].indexOf(e.key)>=0){ e.preventDefault(); go(cur-1); }
+  else if(e.key==="Home"){ e.preventDefault(); go(0); } else if(e.key==="End"){ e.preventDefault(); go(slides.length-1); }
+});
+setCur(0);
+})();
+</script>
+
+</body>
+</html>

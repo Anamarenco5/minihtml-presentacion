@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: minihtml-presentacion
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
